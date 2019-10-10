@@ -11,6 +11,7 @@
 #include <map>
 #include "ns3/address.h"
 #include <algorithm>
+#include "../../rapidjson/document.h"
 
 namespace ns3 {
 	
@@ -162,7 +163,8 @@ class Block
 {
 public:
   Block (int blockHeight, int minerId, int parentBlockMinerId = 0, int blockSizeBytes = 0, 
-         double timeCreated = 0, double timeReceived = 0, Ipv4Address receivedFromIpv4 = Ipv4Address("0.0.0.0"));
+         double timeCreated = 0, double timeReceived = 0, Ipv4Address receivedFromIpv4 = Ipv4Address("0.0.0.0"),
+         const std::vector<std::string>& parents = {});
   Block ();
   Block (const Block &blockSource);  // Copy constructor
   virtual ~Block (void);
@@ -184,6 +186,9 @@ public:
 
   Ipv4Address GetReceivedFromIpv4 (void) const;
   void SetReceivedFromIpv4 (Ipv4Address receivedFromIpv4);
+
+  void SetParents (const std::vector<std::string>);
+  const std::vector<std::string> GetParents (void) const;
     
   /**
    * Checks if the block provided as the argument is the parent of this block object
@@ -194,6 +199,10 @@ public:
    * Checks if the block provided as the argument is a child of this block object
    */
   bool IsChild (const Block &block) const; 
+
+  std::string GetId (void) const;
+
+  rapidjson::Value ToJSON(rapidjson::Document::AllocatorType& allocator) const;
   
   Block& operator= (const Block &blockSource); //Assignment Constructor
   
@@ -208,13 +217,16 @@ protected:
   double        m_timeCreated;                // The time the block was created
   double        m_timeReceived;               // The time the block was received from the node
   Ipv4Address   m_receivedFromIpv4;           // The Ipv4 of the node which sent the block to the receiving node
+  std::vector<std::string> m_parents;
+  std::string   m_id;
 };
 
 class BitcoinChunk : public Block
 {
 public:
   BitcoinChunk (int blockHeight, int minerId, int chunkId, int parentBlockMinerId = 0, int blockSizeBytes = 0, 
-                double timeCreated = 0, double timeReceived = 0, Ipv4Address receivedFromIpv4 = Ipv4Address("0.0.0.0"));
+                double timeCreated = 0, double timeReceived = 0, Ipv4Address receivedFromIpv4 = Ipv4Address("0.0.0.0"),
+                const std::vector<std::string>& parents = {});
   BitcoinChunk ();
   BitcoinChunk (const BitcoinChunk &chunkSource);  // Copy constructor
   virtual ~BitcoinChunk (void);
@@ -286,10 +298,13 @@ public:
    */
   const Block* GetParent (const Block &block);  //Get the parent of newBlock
 
+  const std::vector<Block*> GetParents (const Block &block);
   /**
    * Gets the current top block. If there are two block with the same height (siblings), returns the one received first.
    */
   const Block* GetCurrentTopBlock (void) const;
+
+  const std::vector<Block *> GetTips (void);
 
   /**
    * Adds a new block in the blockchain.
@@ -328,6 +343,7 @@ private:
   int                                m_totalBlocks;       //total number of blocks including the genesis block
   std::vector<std::vector<Block>>    m_blocks;            //2d vector containing all the blocks of the blockchain. (row->blockHeight, col->sibling blocks)
   std::vector<Block>                 m_orphans;           //vector containing the orphans
+  std::vector<Block>                 m_tips;              //DAG tips
 
 
 };

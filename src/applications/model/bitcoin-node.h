@@ -319,6 +319,10 @@ protected:
    */
   void RemoveCompressedBlockReceiveTime ();
 
+  bool IsOrphanBasedOnParents (std::vector<std::string> parents);
+
+  bool IsOrphanBasedOnParentsHeaders (std::vector<std::string> parents);
+
   // In the case of TCP, each socket accept returns a new socket, so the 
   // listening socket is stored separately from the accepted sockets
   Ptr<Socket>     m_socket;                           //!< Listening socket

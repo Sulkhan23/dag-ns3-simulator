@@ -21,7 +21,8 @@ namespace ns3 {
  */
 
 Block::Block(int blockHeight, int minerId, int parentBlockMinerId, int blockSizeBytes, 
-             double timeCreated, double timeReceived, Ipv4Address receivedFromIpv4)
+             double timeCreated, double timeReceived, Ipv4Address receivedFromIpv4,
+             const std::vector<std::string>& parents)
 {  
   m_blockHeight = blockHeight;
   m_minerId = minerId;
@@ -30,12 +31,13 @@ Block::Block(int blockHeight, int minerId, int parentBlockMinerId, int blockSize
   m_timeCreated = timeCreated;
   m_timeReceived = timeReceived;
   m_receivedFromIpv4 = receivedFromIpv4;
-
+  m_parents = parents;
+  m_id = std::to_string(m_blockHeight) + "/" + std::to_string(m_minerId);
 }
 
 Block::Block()
 {  
-  Block(0, 0, 0, 0, 0, 0, Ipv4Address("0.0.0.0"));
+  Block(0, 0, 0, 0, 0, 0, Ipv4Address("0.0.0.0"), {});
 
 }
 
@@ -48,7 +50,8 @@ Block::Block (const Block &blockSource)
   m_timeCreated = blockSource.m_timeCreated;
   m_timeReceived = blockSource.m_timeReceived;
   m_receivedFromIpv4 = blockSource.m_receivedFromIpv4;
-
+  m_parents = blockSource.m_parents;
+  m_id = std::to_string(m_blockHeight) + "/" + std::to_string(m_minerId);
 }
 
 Block::~Block (void)
@@ -115,7 +118,6 @@ Block::GetTimeReceived (void) const
   return m_timeReceived;
 }
   
-
 Ipv4Address 
 Block::GetReceivedFromIpv4 (void) const
 {
@@ -128,24 +130,105 @@ Block::SetReceivedFromIpv4 (Ipv4Address receivedFromIpv4)
   m_receivedFromIpv4 = receivedFromIpv4;
 }
 
+const std::vector<std::string>
+Block::GetParents (void) const 
+{
+  return m_parents;
+}
+
+void
+Block::SetParents (const std::vector<std::string> parents) 
+{
+  m_parents = parents;
+}
+
+
 bool 
 Block::IsParent(const Block &block) const
 {
-  if (GetBlockHeight() == block.GetBlockHeight() - 1 && GetMinerId() == block.GetParentBlockMinerId())
+  std::vector<std::string> parents = block.GetParents();
+  std::vector<std::string>::iterator parent_it;
+  for (parent_it = parents.begin(); parent_it < parents.end(); parent_it++){
+    std::string str = *parent_it;
+    if (m_id.compare(str) == 0) {
+      return true;
+    }
+  }
+
+  return false;
+
+  /*if (GetBlockHeight() == block.GetBlockHeight() - 1 && GetMinerId() == block.GetParentBlockMinerId())
     return true;
   else
 	return false;
+  */
 }
 
 bool 
 Block::IsChild(const Block &block) const
 {
+  std::vector<std::string> parents = GetParents();
+  std::vector<std::string>::iterator parent_it;
+  std::string parentId = block.GetId();
+  for (parent_it = parents.begin(); parent_it < parents.end(); parent_it++){
+    if (parentId.compare(*parent_it) == 0) {
+      return true;
+    }
+  }
+
+  return false;
+/*
   if (GetBlockHeight() == block.GetBlockHeight() + 1 && GetParentBlockMinerId() == block.GetMinerId())
     return true;
   else
     return false;
+    */
 }
 
+std::string
+Block::GetId (void) const
+{
+  /*if (m_id.empty()) {
+    std::ostringstream   stringStream;
+    stringStream << std::to_string(m_blockHeight) << "-" << std::to_string(m_minerId);
+    m_id = stringStream.str();
+  }*/
+  return m_id;
+}
+
+rapidjson::Value Block::ToJSON(rapidjson::Document::AllocatorType& allocator) const {
+  rapidjson::Value     value;
+  rapidjson::Value     array(rapidjson::kArrayType);
+  rapidjson::Value blockInfo(rapidjson::kObjectType);
+
+  value = GetBlockHeight ();
+  blockInfo.AddMember("height", value, allocator);
+
+  value = GetMinerId ();
+  blockInfo.AddMember("minerId", value, allocator);
+
+  value = GetParentBlockMinerId ();
+  blockInfo.AddMember("parentBlockMinerId", value, allocator);
+
+  value = GetBlockSizeBytes ();
+  blockInfo.AddMember("size", value, allocator);
+
+  value = GetTimeCreated ();
+  blockInfo.AddMember("timeCreated", value, allocator);
+
+  value = GetTimeReceived ();							
+  blockInfo.AddMember("timeReceived", value, allocator);
+
+  std::vector<std::string> parents = GetParents();
+  for(std::vector<std::string>::iterator it = parents.begin(); it < parents.end(); it++) {
+    std::string str = *it;
+    value.SetString(str.c_str(), str.length(), allocator);
+    array.PushBack(value, allocator); 
+  }
+  blockInfo.AddMember("parents", array, allocator);
+
+  return blockInfo;
+}
 
 Block& 
 Block::operator= (const Block &blockSource)
@@ -157,6 +240,8 @@ Block::operator= (const Block &blockSource)
   m_timeCreated = blockSource.m_timeCreated;
   m_timeReceived = blockSource.m_timeReceived;
   m_receivedFromIpv4 = blockSource.m_receivedFromIpv4;
+  m_parents = blockSource.m_parents;
+  m_id = std::to_string(m_blockHeight) + "/" + std::to_string(m_minerId);
 
   return *this;
 }
@@ -168,16 +253,16 @@ Block::operator= (const Block &blockSource)
  */
  
 BitcoinChunk::BitcoinChunk(int blockHeight, int minerId, int chunkId, int parentBlockMinerId, int blockSizeBytes, 
-             double timeCreated, double timeReceived, Ipv4Address receivedFromIpv4) :  
+             double timeCreated, double timeReceived, Ipv4Address receivedFromIpv4, const std::vector<std::string>& parents) :  
              Block (blockHeight, minerId, parentBlockMinerId, blockSizeBytes, 
-                    timeCreated, timeReceived, receivedFromIpv4)
+                    timeCreated, timeReceived, receivedFromIpv4, parents)
 {  
   m_chunkId = chunkId;
 }
 
 BitcoinChunk::BitcoinChunk()
 {  
-  BitcoinChunk(0, 0, 0, 0, 0, 0, 0, Ipv4Address("0.0.0.0"));
+  BitcoinChunk(0, 0, 0, 0, 0, 0, 0, Ipv4Address("0.0.0.0"), {});
 }
 
 BitcoinChunk::BitcoinChunk (const BitcoinChunk &chunkSource)
@@ -190,7 +275,8 @@ BitcoinChunk::BitcoinChunk (const BitcoinChunk &chunkSource)
   m_timeCreated = chunkSource.m_timeCreated;
   m_timeReceived = chunkSource.m_timeReceived;
   m_receivedFromIpv4 = chunkSource.m_receivedFromIpv4;
-
+  m_id = chunkSource.m_id;
+  m_parents = chunkSource.m_parents;
 }
 
 BitcoinChunk::~BitcoinChunk (void)
@@ -220,6 +306,8 @@ BitcoinChunk::operator= (const BitcoinChunk &chunkSource)
   m_timeCreated = chunkSource.m_timeCreated;
   m_timeReceived = chunkSource.m_timeReceived;
   m_receivedFromIpv4 = chunkSource.m_receivedFromIpv4;
+  m_id = chunkSource.m_id;
+  m_parents = chunkSource.m_parents;
 
   return *this;
 }
@@ -235,8 +323,8 @@ Blockchain::Blockchain(void)
 {
   m_noStaleBlocks = 0;
   m_totalBlocks = 0;
-  Block genesisBlock(0, -1, -2, 0, 0, 0, Ipv4Address("0.0.0.0"));
-  AddBlock(genesisBlock); 
+  Block genesisBlock(0, -1, -2, 0, 0, 0, Ipv4Address("0.0.0.0"), {});
+  AddBlock(genesisBlock);
 }
 
 Blockchain::~Blockchain (void)
@@ -427,6 +515,13 @@ Blockchain::GetOrphanChildrenPointers (const Block &newBlock)
 const Block* 
 Blockchain::GetParent (const Block &block) 
 {
+  std::vector<Block*> parents = this->GetParents(block);
+  if (!parents.empty()) {
+    return parents[0];
+  }
+
+  return nullptr;
+  /*
   std::vector<Block>::iterator  block_it;
   int parentHeight = block.GetBlockHeight() - 1;
 
@@ -441,8 +536,43 @@ Blockchain::GetParent (const Block &block)
   }
 
   return nullptr;
+  */
 }
 
+const std::vector<Block*>
+Blockchain::GetParents (const Block &block)
+{
+  std::vector<std::string>::iterator parent_it;
+  std::vector<std::string> parent_ids = block.GetParents();
+  std::vector<Block>::iterator  block_it;
+  std::vector<Block*> parentBlocks;
+
+  for (parent_it = parent_ids.begin(); parent_it < parent_ids.end(); parent_it++)
+  {
+    std::string parentStr = *parent_it;
+    int slash_idx = parentStr.find("/");
+    int parentHeight = std::stoi(parentStr.substr(0, slash_idx));
+    int parentMiner = std::stoi(parentStr.substr(slash_idx + 1));
+
+    if (parentHeight > GetBlockchainHeight() || parentHeight < 0) {
+      continue;
+    }
+
+    for (block_it = m_blocks[parentHeight].begin();  block_it < m_blocks[parentHeight].end(); block_it++)  {
+      Block parentBlock = *block_it;
+      if (parentBlock.GetMinerId() == parentMiner) {
+        parentBlocks.push_back(&(*block_it));
+      }
+    }
+  }
+
+  if (parent_ids.size() == parentBlocks.size()) {
+    return parentBlocks;
+  } else {
+    parentBlocks.clear();
+    return parentBlocks;
+  }
+}
 
 const Block* 
 Blockchain::GetCurrentTopBlock (void) const
@@ -450,11 +580,22 @@ Blockchain::GetCurrentTopBlock (void) const
   return &m_blocks[m_blocks.size() - 1][0];
 }
 
+const std::vector<Block*> 
+Blockchain::GetTips (void) 
+{
+  std::vector<Block *> tips;
+  std::vector<Block>::iterator  block_it;
+
+  for (block_it = m_tips.begin();  block_it < m_tips.end(); block_it++)
+  {
+    tips.push_back(&(*block_it));
+  }
+  return tips; 
+}
 
 void 
 Blockchain::AddBlock (const Block& newBlock)
 {
-
   if (m_blocks.size() == 0)
   {
     std::vector<Block> newHeight(1, newBlock);
@@ -488,6 +629,28 @@ Blockchain::AddBlock (const Block& newBlock)
   }
   
   m_totalBlocks++;
+
+  // update tip set
+  // remove parents of new block
+  std::vector<std::string> parents = newBlock.GetParents();
+  std::vector<std::string>::iterator parentIter = parents.begin();
+  for (;parentIter < parents.end(); parentIter++) {
+    std::string parentBlock = *parentIter;
+    std::vector<Block>::iterator iter = m_tips.begin();
+    while (iter != m_tips.end())
+    {
+      Block tip = *iter;
+      if (tip.GetId().compare(parentBlock) == 0) {
+        iter = m_tips.erase(iter);
+      }
+      else {
+        ++iter;
+      }
+    }
+  }
+
+  // add block to tip set
+  m_tips.push_back(newBlock);
 }
 
 
@@ -654,6 +817,13 @@ bool operator< (const BitcoinChunk &chunk1, const BitcoinChunk &chunk2)
 
 std::ostream& operator<< (std::ostream &out, const Block &block)
 {
+    std::string parentString;
+    for(const auto &s : block.GetParents()) {
+      if(!parentString.empty()) {
+        parentString += ",";
+      }
+      parentString += s;
+    }
 
     out << "(m_blockHeight: " << block.GetBlockHeight() << ", " <<
         "m_minerId: " << block.GetMinerId() << ", " <<
@@ -662,12 +832,20 @@ std::ostream& operator<< (std::ostream &out, const Block &block)
         "m_timeCreated: " << block.GetTimeCreated() << ", " <<
         "m_timeReceived: " << block.GetTimeReceived() << ", " <<
         "m_receivedFromIpv4: " << block.GetReceivedFromIpv4() <<
+        "m_parents: " << parentString <<
         ")";
     return out;
 }
 
 std::ostream& operator<< (std::ostream &out, const BitcoinChunk &chunk)
 {
+    std::string parentString;
+      for(const auto &s : chunk.GetParents()) {
+        if(!parentString.empty()) {
+          parentString += ",";
+        }
+        parentString += s;
+      }
 
     out << "(m_blockHeight: " << chunk.GetBlockHeight() << ", " <<
         "m_minerId: " << chunk.GetMinerId() << ", " <<
@@ -676,7 +854,8 @@ std::ostream& operator<< (std::ostream &out, const BitcoinChunk &chunk)
         "m_blockSizeBytes: " << chunk.GetBlockSizeBytes() << ", " <<
         "m_timeCreated: " << chunk.GetTimeCreated() << ", " <<
         "m_timeReceived: " << chunk.GetTimeReceived() << ", " <<
-        "m_receivedFromIpv4: " << chunk.GetReceivedFromIpv4() <<
+        "m_receivedFromIpv4: " << chunk.GetReceivedFromIpv4() << ", " <<
+        "m_parents: " << parentString <<
         ")";
     return out;
 }
