@@ -416,9 +416,24 @@ BitcoinMiner::MineBlock (void)
   rapidjson::Document inv; 
   rapidjson::Document block; 
 
-  int height =  m_blockchain.GetCurrentTopBlock()->GetBlockHeight() + 1;
+  std::vector<Block*> tips = m_blockchain.GetTips();
+  std::vector<Block*>::iterator  tips_it;
+  std::vector<std::string> parentIds;
+  // height is max height of parents + 1
+  int maxHeight = 0;
+  int parentBlockMinerId;
+  for (tips_it = tips.begin();  tips_it < tips.end(); tips_it++) {
+    Block parent = *(*tips_it);
+    if (parent.GetBlockHeight() >= maxHeight) {
+      maxHeight = parent.GetBlockHeight();
+      parentBlockMinerId = parent.GetMinerId();
+    }
+    parentIds.push_back(parent.GetId());
+  }
+
+  int height =  maxHeight + 1;
   int minerId = GetNode ()->GetId ();
-  int parentBlockMinerId = m_blockchain.GetCurrentTopBlock()->GetMinerId();
+  //int parentBlockMinerId = m_blockchain.GetCurrentTopBlock()->GetMinerId();
   double currentTime = Simulator::Now ().GetSeconds ();
   std::ostringstream stringStream;  
   std::string blockHash;
@@ -468,8 +483,11 @@ BitcoinMiner::MineBlock (void)
     m_nextBlockSize = m_averageTransactionSize + m_headersSizeBytes;
 
   Block newBlock (height, minerId, parentBlockMinerId, m_nextBlockSize,
-                  currentTime, currentTime, Ipv4Address("127.0.0.1"));
+                  currentTime, currentTime, Ipv4Address("127.0.0.1"),
+                  parentIds);
 	  
+  std::cout << "Miner " << minerId << " created new block " + newBlock.GetId() + "\n";
+  std::cout << newBlock << "\n";
   switch(m_blockBroadcastType)				  
   {
     case STANDARD:
@@ -501,7 +519,7 @@ BitcoinMiner::MineBlock (void)
           value.SetString(blockHash.c_str(), blockHash.size(), inv.GetAllocator());
           blockInfo.AddMember("hash", value, inv.GetAllocator ());
 
-	      value = newBlock.GetBlockSizeBytes ();
+	        value = newBlock.GetBlockSizeBytes ();
           blockInfo.AddMember("size", value, inv.GetAllocator ());
 		  
           value = true;
@@ -513,7 +531,8 @@ BitcoinMiner::MineBlock (void)
       }
       else if (m_protocolType == SENDHEADERS)
       {
-
+        blockInfo = newBlock.ToJSON(inv.GetAllocator());
+        /*
         value = newBlock.GetBlockHeight ();
         blockInfo.AddMember("height", value, inv.GetAllocator ());
 
@@ -531,7 +550,7 @@ BitcoinMiner::MineBlock (void)
 
         value = newBlock.GetTimeReceived ();							
         blockInfo.AddMember("timeReceived", value, inv.GetAllocator ());
-
+        */
         if (!m_blockTorrent)
         {
           value = HEADERS;
@@ -562,6 +581,8 @@ BitcoinMiner::MineBlock (void)
       value.SetString("block"); //Remove
       block.AddMember("type", value, block.GetAllocator());
 
+      blockInfo = newBlock.ToJSON(block.GetAllocator());
+      /*
       value = newBlock.GetBlockHeight ();
       blockInfo.AddMember("height", value, block.GetAllocator ());
 
@@ -579,7 +600,7 @@ BitcoinMiner::MineBlock (void)
 
       value = newBlock.GetTimeReceived ();							
       blockInfo.AddMember("timeReceived", value, block.GetAllocator ());
-
+      */
       array.PushBack(blockInfo, block.GetAllocator());
       block.AddMember("blocks", array, block.GetAllocator());
       
@@ -630,6 +651,8 @@ BitcoinMiner::MineBlock (void)
       else if (m_protocolType == SENDHEADERS)
       {
 
+        headersInfo = newBlock.ToJSON(inv.GetAllocator());
+        /*
         value = newBlock.GetBlockHeight ();
         headersInfo.AddMember("height", value, inv.GetAllocator ());
 
@@ -647,7 +670,7 @@ BitcoinMiner::MineBlock (void)
 
         value = newBlock.GetTimeReceived ();							
         headersInfo.AddMember("timeReceived", value, inv.GetAllocator ());
-		
+		    */
         if (!m_blockTorrent)
         {
           value = HEADERS;
@@ -675,6 +698,8 @@ BitcoinMiner::MineBlock (void)
       value.SetString("compressed-block"); //Remove
       block.AddMember("type", value, block.GetAllocator());
 
+      blockInfo = newBlock.ToJSON(block.GetAllocator());
+      /*
       value = newBlock.GetBlockHeight ();
       blockInfo.AddMember("height", value, block.GetAllocator ());
 
@@ -692,7 +717,7 @@ BitcoinMiner::MineBlock (void)
 
       value = newBlock.GetTimeReceived ();							
       blockInfo.AddMember("timeReceived", value, block.GetAllocator ());
-
+*/
       blockArray.PushBack(blockInfo, block.GetAllocator());
       block.AddMember("blocks", blockArray, block.GetAllocator());
       
@@ -713,6 +738,8 @@ BitcoinMiner::MineBlock (void)
       value.SetString("block"); //Remove
       inv.AddMember("type", value, inv.GetAllocator());
 
+      blockNodesInfo = newBlock.ToJSON(inv.GetAllocator());
+      /*
       value = newBlock.GetBlockHeight ();
       blockNodesInfo.AddMember("height", value, inv.GetAllocator ());
 
@@ -730,7 +757,7 @@ BitcoinMiner::MineBlock (void)
 
       value = newBlock.GetTimeReceived ();							
       blockNodesInfo.AddMember("timeReceived", value, inv.GetAllocator ());
-
+*/
       invArray.PushBack(blockNodesInfo, inv.GetAllocator());
       inv.AddMember("blocks", invArray, inv.GetAllocator());
 	  
@@ -742,6 +769,8 @@ BitcoinMiner::MineBlock (void)
       value.SetString("compressed-block"); //Remove
       block.AddMember("type", value, block.GetAllocator());
 
+      blockInfo = newBlock.ToJSON(block.GetAllocator());
+      /*
       value = newBlock.GetBlockHeight ();
       blockInfo.AddMember("height", value, block.GetAllocator ());
 
@@ -759,7 +788,7 @@ BitcoinMiner::MineBlock (void)
 
       value = newBlock.GetTimeReceived ();							
       blockInfo.AddMember("timeReceived", value, block.GetAllocator ());
-
+*/
       blockArray.PushBack(blockInfo, block.GetAllocator());
       block.AddMember("blocks", blockArray, block.GetAllocator());
       
